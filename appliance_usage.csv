@@ -1,0 +1,26 @@
+date,appliance,start_time,end_time,mode,kwh_consumed,avg_temp,weather_condition
+11/4/2025,Air Conditioning,18:00,22:00,Cooling,4.2,29.5,Clear
+11/4/2025,Washing Machine,10:00,11:00,Eco,0.6,29.5,Clear
+11/4/2025,Dishwasher,20:00,21:00,Normal,0.9,29.5,Clear
+11/4/2025,Microwave,8:00,8:15,High,0.3,29.5,Clear
+11/4/2025,Computer,14:00,18:00,Active Use,0.4,29.5,Clear
+11/5/2025,Air Conditioning,19:00,23:00,Cooling,4.8,30.1,Partly Cloudy
+11/5/2025,Washing Machine,9:30,10:30,Quick,0.7,30.1,Partly Cloudy
+11/5/2025,Dishwasher,21:00,22:00,Heavy,1,30.1,Partly Cloudy
+11/5/2025,Microwave,13:00,13:20,Medium,0.2,30.1,Partly Cloudy
+11/5/2025,Computer,15:00,19:00,Active Use,0.5,30.1,Partly Cloudy
+11/6/2025,Air Conditioning,17:00,21:00,Cooling,4,28.8,Cloudy
+11/6/2025,Washing Machine,11:00,12:00,Eco,0.6,28.8,Cloudy
+11/6/2025,Dishwasher,19:30,20:30,Normal,0.8,28.8,Cloudy
+11/6/2025,Microwave,7:30,7:45,High,0.3,28.8,Cloudy
+11/6/2025,Computer,13:00,17:00,Active Use,0.4,28.8,Cloudy
+11/7/2025,Air Conditioning,18:30,22:30,Cooling,4.4,31,Clear
+11/7/2025,Washing Machine,10:00,11:00,Eco,0.6,31,Clear
+11/7/2025,Dishwasher,20:00,21:00,Heavy,1.1,31,Clear
+11/7/2025,Microwave,12:00,12:20,Medium,0.2,31,Clear
+11/7/2025,Computer,14:00,18:00,Active Use,0.5,31,Clear
+11/8/2025,Air Conditioning,19:00,23:00,Cooling,5.1,32.2,Hot
+11/8/2025,Washing Machine,8:30,9:30,Quick,0.8,32.2,Hot
+11/8/2025,Dishwasher,21:30,22:30,Normal,0.9,32.2,Hot
+11/8/2025,Microwave,18:00,18:15,High,0.3,32.2,Hot
+11/8/2025,Computer,16:00,20:00,Active Use,0.6,32.2,Hot
