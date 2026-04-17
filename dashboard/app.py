@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import date, datetime, timedelta
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from src.predict import EnergyPredictor, PredictConfig
+from src.sensor_mapper import get_latest_metrics
 
 
 ARTIFACTS_DIR = "artifacts"
@@ -29,10 +31,235 @@ def load_daily_home() -> pd.DataFrame:
     return pd.read_pickle(path)
 
 
+@st.cache_data
+def load_daily_appliance() -> pd.DataFrame:
+    path = os.path.join(ARTIFACTS_DIR, "daily_appliance.pkl")
+    return pd.read_pickle(path)
+
+
+@st.cache_data
+def load_peak_hour_usage() -> Optional[dict[str, Any]]:
+    path = os.path.join(ARTIFACTS_DIR, "peak_hour_usage.pkl")
+    if not os.path.isfile(path):
+        return None
+    return pd.read_pickle(path)
+
+
+def _avg_kwh_by_appliance_global(daily_appliance: pd.DataFrame) -> pd.Series:
+    """Mean daily kWh per appliance type across the whole dataset (baseline for insights)."""
+    return daily_appliance.groupby("Appliance Type", observed=True)["kwh_day"].mean()
+
+
+def _avg_kwh_by_home_appliance(daily_appliance: pd.DataFrame, home_id: str) -> pd.Series:
+    """Mean daily kWh for this home + appliance type (personalized baseline)."""
+    sub = daily_appliance[daily_appliance["Home ID"].astype(str) == str(home_id)]
+    return sub.groupby("Appliance Type", observed=True)["kwh_day"].mean()
+
+
+def _build_optimization_suggestions(
+    top3: list,
+    temp_used: float,
+) -> list[str]:
+    """Action-style tips: cost windows, temperature drivers (heuristic)."""
+    lines: list[str] = []
+    app_names_lower = [a.lower() for a, _ in top3]
+
+    # Temperature-driven load (realistic copy for demos)
+    hot_threshold = 26.0
+    cold_threshold = 12.0
+    if temp_used >= hot_threshold and any("air" in n or "conditioning" in n for n in app_names_lower):
+        lines.append("High consumption due to temperature.")
+        lines.append(
+            "Cooling load is likely elevated — try a slightly higher AC setpoint and trim use during the hottest hours."
+        )
+    if temp_used <= cold_threshold and any("heater" in n for n in app_names_lower):
+        lines.append("High consumption due to temperature.")
+        lines.append(
+            "Heating load is likely elevated on colder days — check insulation and lower setpoint when comfortable."
+        )
+
+    for app, _kwh in top3:
+        al = app.lower()
+        if "washing" in al or "dishwasher" in al or "dryer" in al:
+            lines.append(f"**{app}:** run after 8 PM to reduce cost.")
+        elif "oven" in al or "microwave" in al:
+            lines.append(
+                f"**{app}:** batch cooking or shifting use to after 8 PM can trim peak-period cost."
+            )
+        elif "computer" in al or "tv" in al:
+            lines.append(
+                f"**{app}:** enable sleep/standby and avoid idle all-day use to cut standby draw."
+            )
+        elif "lights" in al or "light" in al:
+            lines.append(
+                f"**{app}:** switch off when rooms are empty; after 8 PM, dim or zone lighting to save cost."
+            )
+
+    # De-duplicate while preserving order
+    seen: set[str] = set()
+    out: list[str] = []
+    for line in lines:
+        if line not in seen:
+            seen.add(line)
+            out.append(line)
+    if not out:
+        out.append(
+            "Shift flexible loads to off-peak hours and review always-on devices to lower daily cost."
+        )
+    return out
+
+
+def _build_efficiency_insights(
+    appliance_preds: dict,
+    top3: list,
+    avg_global: pd.Series,
+    avg_home: pd.Series,
+) -> list[str]:
+    """Compare predicted kWh to historical averages (dataset + this home)."""
+    insights: list[str] = []
+    for app, pred_kwh in top3:
+        g = float(avg_global.get(app, float("nan")))
+        h = float(avg_home.get(app, float("nan")))
+
+        if np.isfinite(g) and g > 1e-6:
+            pct_vs_global = (pred_kwh - g) / g * 100.0
+            if pct_vs_global >= 5:
+                insights.append(
+                    f"**{app}** is predicted to use **{pct_vs_global:.0f}% more** than the **dataset average** "
+                    f"for this appliance type (~{g:.2f} kWh/day)."
+                )
+            elif pct_vs_global <= -5:
+                insights.append(
+                    f"**{app}** is predicted to use **{abs(pct_vs_global):.0f}% less** than the **dataset average** "
+                    f"for this appliance type (~{g:.2f} kWh/day)."
+                )
+            else:
+                insights.append(
+                    f"**{app}** is close to the **dataset average** for this type (~{g:.2f} kWh/day)."
+                )
+        else:
+            insights.append(f"**{app}:** not enough history to compare to a global average.")
+
+        if np.isfinite(h) and h > 1e-6:
+            pct_vs_home = (pred_kwh - h) / h * 100.0
+            if abs(pct_vs_home) >= 5:
+                insights.append(
+                    f"🔹 Compared to **this home’s own past** daily average for **{app}** (~{h:.2f} kWh/day), "
+                    f"today’s prediction is **{pct_vs_home:+.0f}%**."
+                )
+
+    return insights
+
+
+def _build_peak_hour_insights(
+    home_id: str,
+    top3: list,
+    peak_data: Optional[dict[str, Any]],
+) -> list[str]:
+    """
+    Use row-level `Time` from the raw dataset (via preprocess) to estimate
+    share of kWh in evening peak (6–10 PM) and after 8 PM.
+    """
+    if peak_data is None:
+        return [
+            "🔹 **Peak-hour usage (from `Time`):** run `python src/preprocess.py` to build `peak_hour_usage.pkl`, then restart the app."
+        ]
+
+    ha = peak_data.get("home_appliance")
+    gl = peak_data.get("appliance_global")
+    if ha is None or gl is None or ha.empty:
+        return [
+            "🔹 Peak-hour stats are missing or empty — rerun preprocessing on the CSV that includes **Time**."
+        ]
+
+    lines: list[str] = []
+    ha = ha.copy()
+    ha["Home ID"] = ha["Home ID"].astype(str)
+
+    for app, _pred in top3:
+        sub = ha[(ha["Home ID"] == str(home_id)) & (ha["Appliance Type"] == app)]
+        if not sub.empty and float(sub.iloc[0]["total_kwh"]) >= 1e-9:
+            r = sub.iloc[0]
+            label = "From **this home’s** recorded start times"
+        else:
+            subg = gl[gl["Appliance Type"] == app]
+            if subg.empty:
+                continue
+            r = subg.iloc[0]
+            label = "From **dataset-wide** recorded start times"
+
+        ps = float(r["peak_share"])
+        a8 = float(r["after8_share"])
+
+        if ps >= 0.30:
+            lines.append(
+                f"🔹 {label}, **~{ps * 100:.0f}%** of historical **{app}** kWh falls in **peak hours (6–10 PM)** — "
+                f"shift flexible use **after 8 PM** where possible to reduce peak charges."
+            )
+        elif a8 >= 0.45:
+            lines.append(
+                f"🔹 {label}, **~{a8 * 100:.0f}%** of **{app}** kWh is already logged **after 8 PM** — "
+                f"prioritize **shorter cycles / eco modes** over time-shifting."
+            )
+        else:
+            lines.append(
+                f"🔹 {label}: **{app}** — **{ps * 100:.0f}%** of kWh in **peak 6–10 PM**, **{a8 * 100:.0f}%** **after 8 PM**."
+            )
+
+    if not lines:
+        lines.append(
+            "🔹 No peak-time breakdown for these appliances — check `peak_hour_usage.pkl` after preprocessing."
+        )
+    return lines
+
+
 def main():
     st.set_page_config(page_title="Energy Optimization Dashboard", layout="wide")
-    st.title("AI-Driven Energy Consumption Optimization (Hackathon Demo)")
-    st.caption("Forecasting appliance-wise + home/building energy and cost using your provided dataset (simulated IoT).")
+    st.title("AI-Driven Energy Consumption Optimization (Live IoT Demo)")
+    st.caption("Forecasting appliance-wise + home/building energy and cost using historical data and live Android phone sensors.")
+
+    # --- LIVE COMMAND CENTER ---
+    st.header("📡 Today's Command Center (Live IoT Data)")
+    
+    live_metrics = get_latest_metrics()
+    
+    if live_metrics:
+        # We parse the timestamp directly since it's an ISO string
+        try:
+            last_sync = datetime.fromisoformat(live_metrics['timestamp'])
+            time_diff = datetime.now() - last_sync
+            status_color = "🟢" if time_diff.total_seconds() < 60 else "🟠"
+            sync_text = last_sync.strftime('%H:%M:%S')
+        except ValueError:
+            status_color = "🟢"
+            sync_text = live_metrics['timestamp']
+            
+        st.write(f"{status_color} **Live Sync Status**: Last received at {sync_text} (Phone streaming active)")
+        
+        l1, l2, l3, l4 = st.columns(4)
+        l1.metric("Live Lighting Load", f"{live_metrics['live_lighting_kw']:.2f} kW")
+        l2.metric("Live Appliance Load", f"{live_metrics['live_appliance_kw']:.2f} kW")
+        l3.metric("Live Base Load", f"{live_metrics['live_base_kw']:.2f} kW")
+        l4.metric("Total Live Load", f"{live_metrics['total_live_kw']:.2f} kW")
+        
+        # Calculate waste if live load differs significantly from expected behavior (naive approach for demo)
+        st.subheader("💡 Energy Waste & Live Insights")
+        if live_metrics['total_live_kw'] > 1.0 and live_metrics['raw_lux'] < 50:
+            st.error("⚠️ **Energy Waste Alert**: High load detected but room is dark/empty. Did you leave appliances running?")
+        elif live_metrics['raw_lux'] > 500 and live_metrics['live_lighting_kw'] > 0:
+            st.warning("⚠️ **Energy Waste Alert**: Bright natural light detected, but lights appear to be on.")
+        elif live_metrics['raw_noise'] < -50 and live_metrics['live_appliance_kw'] > 0:
+            st.info("ℹ️ **Insight**: Low ambient noise but high appliance load. Ensure no silent appliances (heaters) are forgotten.")
+        else:
+            st.success("✅ **Optimal**: Live usage matches environmental conditions. No immediate waste detected.")
+            
+        st.button("🔄 Refresh Live Data")
+        st.divider()
+    else:
+        st.info("Waiting for live sensor data... Connect your Android phone to the local server.")
+        st.button("🔄 Check Again")
+        st.divider()
+    # ---------------------------
 
     # Model readiness check
     needed_models = [
@@ -114,24 +341,28 @@ def main():
     else:
         st.warning("No appliances found for selected Home ID in the dataset.")
 
-    # Optimization narrative (simple heuristic)
+    # 2 & 3 — Optimization suggestion + efficiency insight (forecast + historical averages)
     if appliance_preds:
+        daily_appliance_df = load_daily_appliance()
+        avg_global = _avg_kwh_by_appliance_global(daily_appliance_df)
+        avg_home = _avg_kwh_by_home_appliance(daily_appliance_df, str(home_id))
         top3 = sorted(appliance_preds.items(), key=lambda kv: kv[1], reverse=True)[:3]
-        st.subheader("Optimization suggestions (based on top contributors)")
-        for app, kwh in top3:
-            app_lower = app.lower()
-            suggestion = "Consider reducing usage or shifting to lower-demand periods when possible."
-            if "air" in app_lower or "conditioning" in app_lower:
-                suggestion = "Reduce cooling setpoint slightly and avoid peak hours; try 1-2°C higher target."
-            elif "heater" in app_lower:
-                suggestion = "Reduce heating setpoint slightly and prefer passive warming; avoid unnecessary heating hours."
-            elif "lights" in app_lower:
-                suggestion = "Switch to LED and turn off when not needed; aim for shorter usage windows."
-            elif "washing" in app_lower or "dishwasher" in app_lower:
-                suggestion = "Run during off-peak hours and enable eco modes to reduce total kWh."
-            elif "oven" in app_lower or "microwave" in app_lower:
-                suggestion = "Plan cooking to reduce repeated heating cycles during peak demand."
-            st.write(f"- `{app}` predicted at {kwh:.2f} kWh: {suggestion}")
+
+        st.markdown("### 2. Optimization suggestion")
+        st.caption("Actionable tips from today’s forecast and context (temperature, shiftable loads).")
+        st.markdown("👉 **This is your real value** — use these to cut cost and peak demand.")
+        for line in _build_optimization_suggestions(top3, temp_used):
+            st.markdown(f"- {line}")
+
+        st.markdown("### 3. Efficiency insight")
+        st.caption(
+            "How today’s predicted use compares to averages, plus **peak-hour concentration** inferred from **row-level `Time`** in the raw data (6–10 PM vs after 8 PM)."
+        )
+        for line in _build_efficiency_insights(appliance_preds, top3, avg_global, avg_home):
+            st.markdown(f"- {line}")
+        peak_payload = load_peak_hour_usage()
+        for line in _build_peak_hour_insights(str(home_id), top3, peak_payload):
+            st.markdown(f"- {line}")
 
     # Home vs building summary
     st.subheader("Daily totals")
