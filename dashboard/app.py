@@ -595,6 +595,10 @@ def render_features_page():
         color: #ffffff !important;
     }
     
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+    
     .feat-title {
         font-size: 3rem;
         font-weight: 800;
@@ -633,6 +637,22 @@ def render_features_page():
         line-height: 1.5;
         font-size: 0.95rem;
     }
+    
+    /* Buttons */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 0.5rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+    }
+    .stButton > button[kind="secondary"] {
+        background-color: transparent !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        border-radius: 0.5rem !important;
+    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -663,40 +683,147 @@ def render_features_page():
     st.markdown("<div class='feat-title'>System <span>Capabilities</span></div>", unsafe_allow_html=True)
     st.markdown("<div class='feat-sub'>Our end-to-end pipeline leverages AI and IoT to revolutionize building management.</div>", unsafe_allow_html=True)
     
-    f1, f2, f3 = st.columns(3)
-    with f1:
-        st.markdown('''
-        <div class="feature-card">
-            <div style="font-size: 2rem; margin-bottom: 1rem; color: #3b82f6;">📈</div>
-            <div class="feature-title">Demand Prediction</div>
-            <div class="feature-text">Our machine learning models analyze temporal trends and real-time inputs to forecast peak energy demand with extreme accuracy.</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with f2:
-        st.markdown('''
-        <div class="feature-card">
-            <div style="font-size: 2rem; margin-bottom: 1rem; color: #8b5cf6;">🌡️</div>
-            <div class="feature-title">Smart HVAC & Lighting</div>
-            <div class="feature-text">Stream IoT telemetry (lux, noise) to dynamically optimize infrastructure loads and activate daylight harvesting heuristics automatically.</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with f3:
-        st.markdown('''
-        <div class="feature-card">
-            <div style="font-size: 2rem; margin-bottom: 1rem; color: #f97316;">💡</div>
-            <div class="feature-title">AI Recommendations</div>
-            <div class="feature-text">Actionable optimization insights designed to maximize energy savings and dramatically reduce your building's carbon footprint.</div>
-        </div>
-        ''', unsafe_allow_html=True)
+    _, center_col, _ = st.columns([1, 4, 1])
+    with center_col:
+        f1, f2 = st.columns(2)
+        with f1:
+            st.markdown('''
+            <div class="feature-card">
+                <div style="font-size: 2rem; margin-bottom: 1rem; color: #3b82f6;">📱</div>
+                <div class="feature-title">Live Sensor Telemetry</div>
+                <div class="feature-text">Connect the Sensor Logger app to stream real-time environmental data (lux, noise) to dynamically calculate live infrastructure power draw.</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        with f2:
+            st.markdown('''
+            <div class="feature-card">
+                <div style="font-size: 2rem; margin-bottom: 1rem; color: #8b5cf6;">🤖</div>
+                <div class="feature-title">Predictive Load Modeling</div>
+                <div class="feature-text">Leverage historical datasets and advanced machine learning models to forecast daily and monthly energy consumption with pinpoint accuracy.</div>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+            
+        f3, f4 = st.columns(2)
+        with f3:
+            st.markdown('''
+            <div class="feature-card">
+                <div style="font-size: 2rem; margin-bottom: 1rem; color: #10b981;">☀️</div>
+                <div class="feature-title">Daylight Harvesting</div>
+                <div class="feature-text">Automatically adjust your lighting loads in real-time based on ambient sunlight availability to maximize efficiency without sacrificing comfort.</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        with f4:
+            st.markdown('''
+            <div class="feature-card">
+                <div style="font-size: 2rem; margin-bottom: 1rem; color: #f97316;">📊</div>
+                <div class="feature-title">Peak-Hour Analytics</div>
+                <div class="feature-text">Gain actionable insights into appliance-level consumption patterns and identify high-cost demand spikes during the critical 6 PM - 10 PM peak window.</div>
+            </div>
+            ''', unsafe_allow_html=True)
 
 def render_about_page():
-    col_back, _ = st.columns([1, 10])
-    with col_back:
-        if st.button("←", key="back_btn_about"):
+    css = """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+    
+    .block-container {
+        padding-top: 2rem !important;
+    }
+    
+    .stApp, .stApp > header {
+        background: radial-gradient(circle at center, #1e3a8a 0%, #0f172a 100%) !important;
+        font-family: 'Inter', sans-serif !important;
+        color: #ffffff !important;
+    }
+    
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+    
+    /* Buttons */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 0.5rem !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+    }
+    .stButton > button[kind="secondary"] {
+        background-color: transparent !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        border-radius: 0.5rem !important;
+    }
+    
+    /* About Us Specifics */
+    .mission-container {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 1rem;
+        padding: 4rem 3rem;
+        max-width: 800px;
+        margin: 2rem auto;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .mission-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 2rem;
+        color: #ffffff;
+    }
+    .mission-title span {
+        background: linear-gradient(to right, #3b82f6, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .mission-text {
+        color: #e2e8f0;
+        font-size: 1.15rem;
+        line-height: 1.8;
+        margin-bottom: 1.5rem;
+    }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+    
+    # Navbar
+    c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 3])
+    with c1:
+        st.markdown("<h3 style='margin:0; padding-top:5px;'>⚡ SmartVolt AI</h3>", unsafe_allow_html=True)
+    with c2:
+        if st.button("Home", use_container_width=True, key="abt_nav_home"):
             st.session_state.page = "landing"
             st.rerun()
-    st.title("About Us")
-    st.write("We are dedicated to building the future of energy consumption optimization through AI and IoT.")
+    with c3:
+        if st.button("Features", use_container_width=True, key="abt_nav_feat"):
+            st.session_state.page = "features"
+            st.rerun()
+    with c4:
+        if st.button("About Us", use_container_width=True, key="abt_nav_about"):
+            st.session_state.page = "about"
+            st.rerun()
+    with c5:
+        if st.button("Predictor", use_container_width=True, key="abt_nav_pred"):
+            st.session_state.page = "dashboard"
+            st.rerun()
+            
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="mission-container">
+        <div class="mission-title">Mission <span>Statement</span></div>
+        <div class="mission-text">
+            At SmartVolt AI, we believe that the intersection of advanced artificial intelligence and real-time IoT telemetry holds the key to a sustainable future. Our objective is to seamlessly integrate intelligent predictive models with physical infrastructure, empowering buildings to dynamically optimize their own energy consumption without sacrificing human comfort.
+        </div>
+        <div class="mission-text">
+            By shifting from reactive management to proactive forecasting, we are redefining what it means to be energy-efficient. Our end-to-end platform not only slashes operational costs but fundamentally reduces global carbon footprints, proving that cutting-edge technology and environmental responsibility can—and must—go hand in hand.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def render_landing_page():
     css = """
@@ -796,7 +923,7 @@ def render_landing_page():
             st.session_state.page = "dashboard"
             st.rerun()
             
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Hero
     st.markdown("<div class='hero-title'>AI-Driven Energy <span>Forecasting</span></div>", unsafe_allow_html=True)
@@ -808,34 +935,17 @@ def render_landing_page():
             st.session_state.page = "dashboard"
             st.rerun()
             
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    # Features
-    f1, f2, f3 = st.columns(3)
-    with f1:
-        st.markdown('''
-        <div class="feature-card">
-            <div style="font-size: 2rem; margin-bottom: 1rem; color: #3b82f6;">📈</div>
-            <div class="feature-title">Demand Prediction</div>
-            <div class="feature-text">Our machine learning models analyze temporal trends and real-time inputs to forecast peak energy demand with extreme accuracy.</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with f2:
-        st.markdown('''
-        <div class="feature-card">
-            <div style="font-size: 2rem; margin-bottom: 1rem; color: #8b5cf6;">🌡️</div>
-            <div class="feature-title">Smart HVAC & Lighting</div>
-            <div class="feature-text">Stream IoT telemetry (lux, noise) to dynamically optimize infrastructure loads and activate daylight harvesting heuristics automatically.</div>
-        </div>
-        ''', unsafe_allow_html=True)
-    with f3:
-        st.markdown('''
-        <div class="feature-card">
-            <div style="font-size: 2rem; margin-bottom: 1rem; color: #f97316;">💡</div>
-            <div class="feature-title">AI Recommendations</div>
-            <div class="feature-text">Actionable optimization insights designed to maximize energy savings and dramatically reduce your building's carbon footprint.</div>
-        </div>
-        ''', unsafe_allow_html=True)
+
+
+def render_footer():
+    st.markdown("""
+    <div style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: rgba(15, 23, 42, 0.95); border-top: 1px solid rgba(255,255,255,0.05); padding: 1rem 0; z-index: 999; text-align: center; color: #64748b; font-size: 0.95rem; font-family: 'Inter', sans-serif;">
+        © 2026 SmartVolt AI. Built for the AntiGravity Project. All rights reserved.<br>
+        <span style="font-size: 0.85rem; opacity: 0.7;">Powered by IoT Telemetry & Predictive Analytics</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 def main():
     st.set_page_config(page_title="Antigravity Platform", layout="wide")
@@ -851,6 +961,8 @@ def main():
         render_about_page()
     else:
         render_dashboard()
+        
+    render_footer()
 
 if __name__ == "__main__":
     main()
