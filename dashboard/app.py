@@ -13,7 +13,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from src.predict import EnergyPredictor, PredictConfig
-from src.sensor_mapper import get_latest_metrics
+from src.sensor_mapper import get_latest_metrics, get_recent_history, map_sensors_to_energy
 
 
 ARTIFACTS_DIR = "artifacts"
@@ -235,10 +235,21 @@ def main():
             sync_text = live_metrics['timestamp']
             
         st.write(f"{status_color} **Live Sync Status**: Last received at {sync_text} (Phone streaming active)")
-        
+        history = get_recent_history(2)
+        prev_raw = None
+        if len(history) >= 2:
+            prev_raw = history[-2]
+            
+        def get_raw_delta(live_key, prev_key):
+            if prev_raw and live_key in live_metrics and prev_key in prev_raw:
+                diff = live_metrics[live_key] - prev_raw[prev_key]
+                if abs(diff) > 0.001:
+                    return f"{diff:+.1f}"
+            return "0.0"
+
         l1, l2, l3, l4 = st.columns(4)
-        l1.metric("Live Lighting Load", f"{live_metrics['live_lighting_kw']:.2f} kW", f"{live_metrics['raw_lux']:.0f} Lux", delta_color="off")
-        l2.metric("Live Appliance Load", f"{live_metrics['live_appliance_kw']:.2f} kW", f"{live_metrics['raw_noise']:.0f} dBFS", delta_color="off")
+        l1.metric("Live Lighting Load", f"{live_metrics['live_lighting_kw']:.2f} kW")
+        l2.metric("Live Appliance Load", f"{live_metrics['live_appliance_kw']:.2f} kW")
         l3.metric("Live Base Load", f"{live_metrics['live_base_kw']:.2f} kW")
         l4.metric("Total Live Load", f"{live_metrics['total_live_kw']:.2f} kW")
         
@@ -253,6 +264,7 @@ def main():
         else:
             st.success("✅ **Optimal**: Live usage matches environmental conditions. No immediate waste detected.")
             
+                    
         st.button("🔄 Refresh Live Data")
         st.divider()
     else:
