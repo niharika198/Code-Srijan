@@ -24,17 +24,23 @@ def parse_sensor_logger_payload(line):
             
         # Handle actual Sensor Logger payload
         if "payload" in data:
+            max_noise = -160.0
+            max_lux = 0.0
+            
             for item in data["payload"]:
                 name = item.get("name", "")
                 values = item.get("values", {})
                 
                 if name == "light":
-                    metrics["light_lux"] = values.get("lux", 0)
+                    max_lux = max(max_lux, values.get("lux", 0))
                 elif name == "microphone":
-                    metrics["noise_db"] = values.get("dBFS", 0)
+                    max_noise = max(max_noise, values.get("dBFS", -160))
                 elif name == "battery":
                     metrics["battery_level"] = values.get("level", 100)
                     
+            metrics["light_lux"] = max_lux
+            metrics["noise_db"] = max_noise if max_noise > -160 else 0
+            
         return metrics
     except Exception as e:
         print(f"Error parsing line: {e}")
@@ -47,20 +53,23 @@ def map_sensors_to_energy(metrics):
     # Heuristics for converting phone sensors to kW
     
     # 1. Lighting: High lux = lights on (if it's night) or natural light. 
-    # For simplicity, let's say lux > 100 means lights are on (0.2 kW)
-    lighting_kw = 0.2 if metrics["light_lux"] > 100 else 0.0
+    # Let's make it proportional so the dashboard feels highly responsive to your phone!
+    # For every 1 Lux, we add 0.005 kW, capping out at 1.0 kW (to simulate max brightness)
+    lux = metrics["light_lux"]
+    lighting_kw = min(lux * 0.005, 1.0)
     
-    # 2. Appliances: Loud noise (e.g. TV, washing machine) = power usage
-    # dBFS is usually negative (0 is loudest). If it's above -40, something is running.
-    # If custom test payload uses positive dB, handle that too.
+    # 2. Appliances (Voice/Noise): Loud noise = power usage
+    # dBFS is usually negative (0 is loudest, -80 is very quiet).
+    # Let's make this proportional so it reacts smoothly to your voice!
     noise = metrics["noise_db"]
-    appliance_kw = 0.0
-    if noise > 0: # our mock data
-        if noise > 50: appliance_kw = 1.5
-        elif noise > 30: appliance_kw = 0.5
-    else: # real sensor logger dBFS
-        if noise > -30: appliance_kw = 1.5
-        elif noise > -50: appliance_kw = 0.5
+    if noise > 0: # handling our earlier mock data test
+        appliance_kw = min(noise * 0.02, 2.0)
+    else: # real phone microphone data
+        # Normalize the noise: Assume -80 is silence (0 kW) and 0 is max volume (2.0 kW)
+        clamped_noise = max(noise, -80) # prevent it from dropping below -80
+        # This converts -80 to 0.0, and 0 to 1.0
+        intensity = (clamped_noise + 80) / 80.0 
+        appliance_kw = intensity * 2.0
         
     # 3. Base Load (Fridge, etc.)
     base_kw = 0.3

@@ -237,8 +237,8 @@ def main():
         st.write(f"{status_color} **Live Sync Status**: Last received at {sync_text} (Phone streaming active)")
         
         l1, l2, l3, l4 = st.columns(4)
-        l1.metric("Live Lighting Load", f"{live_metrics['live_lighting_kw']:.2f} kW")
-        l2.metric("Live Appliance Load", f"{live_metrics['live_appliance_kw']:.2f} kW")
+        l1.metric("Live Lighting Load", f"{live_metrics['live_lighting_kw']:.2f} kW", f"{live_metrics['raw_lux']:.0f} Lux", delta_color="off")
+        l2.metric("Live Appliance Load", f"{live_metrics['live_appliance_kw']:.2f} kW", f"{live_metrics['raw_noise']:.0f} dBFS", delta_color="off")
         l3.metric("Live Base Load", f"{live_metrics['live_base_kw']:.2f} kW")
         l4.metric("Total Live Load", f"{live_metrics['total_live_kw']:.2f} kW")
         
