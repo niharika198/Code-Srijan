@@ -101,6 +101,20 @@ def get_latest_metrics():
             
     return energy_metrics
 
+def get_recent_history(limit=50):
+    if not os.path.exists(DATA_FILE):
+        return []
+        
+    history = []
+    from collections import deque
+    with open(DATA_FILE, 'r') as f:
+        lines = deque(f, limit)
+        for line in lines:
+            raw = parse_sensor_logger_payload(line)
+            if raw:
+                history.append(raw)
+    return history
+
 if __name__ == "__main__":
     latest = get_latest_metrics()
     print("Latest mapped metrics:", latest)
