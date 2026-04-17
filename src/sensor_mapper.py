@@ -2,6 +2,7 @@ import json
 import os
 import pandas as pd
 import datetime
+import math
 
 DATA_FILE = "data/live_sensor_data.jsonl"
 MAPPED_FILE = "data/live_energy_metrics.json"
@@ -53,10 +54,12 @@ def map_sensors_to_energy(metrics):
     # Heuristics for converting phone sensors to kW
     
     # 1. Lighting: High lux = lights on (if it's night) or natural light. 
-    # Let's make it proportional so the dashboard feels highly responsive to your phone!
-    # For every 1 Lux, we add 0.005 kW, capping out at 1.0 kW (to simulate max brightness)
+    # For simplicity, let's say lux > 100 means lights are on (0.2 kW)
     lux = metrics["light_lux"]
-    lighting_kw = min(lux * 0.005, 1.0)
+    max_power = 0.2
+    
+    # Daylight harvesting logic: dim lights as ambient lux increases
+    lighting_kw = max_power * math.exp(-lux / 200)
     
     # 2. Appliances (Voice/Noise): Loud noise = power usage
     # dBFS is usually negative (0 is loudest, -80 is very quiet).

@@ -214,12 +214,165 @@ def _build_peak_hour_insights(
 
 
 def main():
-    st.set_page_config(page_title="Energy Optimization Dashboard", layout="wide")
-    st.title("AI-Driven Energy Consumption Optimization (Live IoT Demo)")
-    st.caption("Forecasting appliance-wise + home/building energy and cost using historical data and live Android phone sensors.")
+    st.set_page_config(page_title="Kinetic Observatory", layout="wide")
+    
+    css = """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+    /* Global Background & Typography */
+    .stApp, .stApp > header {
+        background-color: #060e20 !important;
+        color: #a3aac4 !important;
+        font-family: 'Manrope', sans-serif !important;
+    }
+
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #060e20 !important;
+        border-right: none !important;
+    }
+    
+    /* Typography Overrides */
+    h1 {
+        font-family: 'Space Grotesk', sans-serif !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 3.5rem !important; /* display-lg */
+    }
+    
+    h2, h3, h4, h5, h6 {
+        font-family: 'Space Grotesk', sans-serif !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        font-size: 0.85rem !important;
+    }
+
+    /* Luminous Text & Secondary Elements */
+    p, span, div {
+        color: #a3aac4;
+        font-family: 'Manrope', sans-serif;
+    }
+
+    label, .st-bb, .st-af {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.6875rem !important; /* label-sm */
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* Cards & Data Tiles (The "No-Line" Rule + Tonal Layering) */
+    [data-testid="stMetric"] {
+        background-color: #0d1835 !important; /* surface_container_high */
+        padding: 1.5rem !important;
+        border-radius: 0.5rem !important; /* lg */
+        border: none !important;
+        margin-bottom: 1rem !important;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+    }
+    [data-testid="stMetricValue"] {
+        font-family: 'Space Grotesk', sans-serif !important;
+        color: #ffffff !important;
+        font-size: 2.5rem !important;
+    }
+    [data-testid="stMetricLabel"] {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.85rem !important;
+        color: #a3aac4 !important;
+        margin-bottom: 0.75rem !important;
+    }
+    [data-testid="stMetricDelta"] {
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    /* Status Indicators / Buttons */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #ff8f76 0%, #ff785a 100%) !important;
+        color: #600e00 !important;
+        border: none !important;
+        border-radius: 0.5rem !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-weight: 700 !important;
+        padding: 0.75rem 1.5rem !important;
+        box-shadow: 0 4px 12px rgba(255, 143, 118, 0.2) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stButton > button[kind="primary"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(255, 143, 118, 0.3) !important;
+    }
+
+    .stButton > button[kind="secondary"] {
+        background-color: transparent !important;
+        color: #ff8f76 !important;
+        border: 1px solid rgba(163, 170, 196, 0.15) !important; /* Ghost Border */
+        border-radius: 0.5rem !important;
+    }
+
+    /* Inputs & Selectors */
+    .stTextInput > div > div > input, 
+    .stNumberInput > div > div > input, 
+    .stSelectbox > div > div > div,
+    .stDateInput > div > div > input {
+        background-color: #101c3a !important; /* surface_container_highest */
+        color: #ffffff !important;
+        border: 1px solid rgba(163, 170, 196, 0.15) !important; /* Ghost border */
+        border-radius: 0.375rem !important;
+    }
+    .stTextInput > div > div > input:focus, 
+    .stNumberInput > div > div > input:focus, 
+    .stSelectbox > div > div > div:focus {
+        border-color: rgba(255, 143, 118, 0.5) !important;
+        box-shadow: 0 0 0 1px rgba(255, 143, 118, 0.5) !important;
+    }
+
+    /* Success Alert - Glassmorphism */
+    [data-testid="stAlert"] {
+        background-color: rgba(105, 246, 184, 0.1) !important; /* Secondary glass */
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(105, 246, 184, 0.2) !important;
+        color: #69f6b8 !important;
+        border-radius: 0.5rem !important;
+    }
+    
+    /* Error/Warning Alert */
+    div.st-emotion-cache-1n76uvr, div.st-emotion-cache-1n76uvr * {
+        background-color: rgba(255, 177, 72, 0.1) !important;
+        color: #ffb148 !important;
+        border: 1px solid rgba(255, 177, 72, 0.2) !important;
+    }
+
+    /* Dividers */
+    hr {
+        border-color: rgba(163, 170, 196, 0.1) !important;
+        margin: 2rem 0 !important;
+    }
+    
+    /* Hide Plotly Background */
+    .js-plotly-plot .plotly .bg {
+        fill: transparent !important;
+    }
+    .js-plotly-plot .plotly .paper-bg {
+        fill: transparent !important;
+    }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+    col_title, col_status = st.columns([3, 1])
+    with col_title:
+        st.markdown("<h1>Kinetic Observatory</h1>", unsafe_allow_html=True)
+    with col_status:
+        st.markdown("<div style='margin-top: 1rem; background: rgba(105, 246, 184, 0.1); padding: 0.5rem 1rem; border-radius: 2rem; border: 1px solid rgba(105, 246, 184, 0.2); color: #69f6b8; display: inline-block; font-family: Inter, sans-serif; font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 600;'><span style='display:inline-block; width: 6px; height: 6px; background: #69f6b8; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px #69f6b8;'></span>SYSTEM LIVE</div>", unsafe_allow_html=True)
 
     # --- LIVE COMMAND CENTER ---
-    st.header("📡 Today's Command Center (Live IoT Data)")
+    st.header("COMMAND CENTER")
     
     live_metrics = get_latest_metrics()
     
@@ -254,7 +407,7 @@ def main():
         l4.metric("Total Live Load", f"{live_metrics['total_live_kw']:.2f} kW")
         
         # Calculate waste if live load differs significantly from expected behavior (naive approach for demo)
-        st.subheader("💡 Energy Waste & Live Insights")
+        st.header("LIVE INSIGHTS")
         if live_metrics['total_live_kw'] > 1.0 and live_metrics['raw_lux'] < 50:
             st.error("⚠️ **Energy Waste Alert**: High load detected but room is dark/empty. Did you leave appliances running?")
         elif live_metrics['raw_lux'] > 500 and live_metrics['live_lighting_kw'] > 0:
@@ -262,10 +415,11 @@ def main():
         elif live_metrics['raw_noise'] < -50 and live_metrics['live_appliance_kw'] > 0:
             st.info("ℹ️ **Insight**: Low ambient noise but high appliance load. Ensure no silent appliances (heaters) are forgotten.")
         else:
-            st.success("✅ **Optimal**: Live usage matches environmental conditions. No immediate waste detected.")
+            st.success("✅ **Consumption Status: Optimal**\n\nSystem is operating at peak efficiency. Waste detection identifies 0 leakages in current grid.")
             
-                    
-        st.button("🔄 Refresh Live Data")
+        col_btn1, col_btn2 = st.columns([2, 10])
+        with col_btn1:
+            st.button("🔄 Refresh Live Data")
         st.divider()
     else:
         st.info("Waiting for live sensor data... Connect your Android phone to the local server.")
@@ -290,30 +444,33 @@ def main():
     max_dt = pd.to_datetime(daily_home["Date"].max()).date()
 
     with st.sidebar:
-        st.header("Inputs")
-        home_id = st.selectbox("Home / Building unit (Home ID)", home_ids)
-        target_date = st.date_input("Day to predict", value=max_dt, min_value=min_dt, max_value=max_dt)
-        month_start = st.date_input("Month to predict (monthly total)", value=max_dt.replace(day=1), min_value=min_dt)
+        st.markdown("<h2 style='color: #ff8f76 !important; font-size: 1.5rem !important; margin-bottom: 0;'>Energy AI</h2><p style='font-family: Inter, sans-serif; font-size: 0.6875rem; color: #a3aac4; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2rem; margin-top: 0.25rem;'><span style='display:inline-block; width: 6px; height: 6px; background: #69f6b8; border-radius: 50%; margin-right: 8px;'></span>LIVE TELEMETRY</p>", unsafe_allow_html=True)
+        
+        home_id = st.selectbox("RESIDENTIAL UNIT", home_ids)
+        target_date = st.date_input("DAY TO PREDICT", value=max_dt, min_value=min_dt, max_value=max_dt)
+        month_start = st.date_input("MONTH AGGREGATE", value=max_dt.replace(day=1), min_value=min_dt)
 
-        tariff_per_kwh = st.number_input(
-            "Tariff per kWh (for cost prediction)",
+        tariff_per_kwh = st.slider(
+            "TARIFF PER KWH",
             min_value=0.0,
-            value=7.0,
-            step=0.1,
-            help="Set your electricity price. Cost = kWh * tariff.",
+            max_value=1.0,
+            value=0.14,
+            step=0.01,
         )
 
-        use_expected_temp = st.checkbox("Provide expected outdoor temperature (°C)", value=False)
+        use_expected_temp = st.toggle("Outdoor Temp", value=False)
         expected_temp = None
         if use_expected_temp:
             expected_temp = st.number_input("Expected outdoor temperature (°C)", value=28.0, step=0.5, format="%.2f")
 
-        compute_btn = st.button("Predict", type="primary")
+        st.markdown("<br>", unsafe_allow_html=True)
+        compute_btn = st.button("⚡ Predict Results", type="primary", use_container_width=True)
 
     predictor = load_predictor()
 
     if not compute_btn:
-        st.info("Pick inputs and click Predict.")
+        st.header("PREDICTIVE ANALYSIS")
+        st.markdown("<div style='text-align: center; padding: 4rem; background: #0d1835; border-radius: 0.5rem; margin-top: 1rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(163, 170, 196, 0.1);'><h3 style='color: #ffffff; margin-bottom: 1rem;'>No Forecast Data Generated</h3><p>Pick inputs from the control panel and click <span style='color: #ff8f76; font-weight: 600;'>Predict Results</span> to see energy forecasting results for your selected timeline.</p></div>", unsafe_allow_html=True)
         return
 
     # Predict day
