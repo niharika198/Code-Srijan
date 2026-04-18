@@ -792,7 +792,7 @@ def render_footer():
 
 
 def main():
-    st.set_page_config(page_title="Antigravity Platform", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="SmartVolt AI", layout="wide", initial_sidebar_state="expanded")
     
     if "page" not in st.session_state:
         st.session_state.page = "landing"
