@@ -14,8 +14,10 @@ def parse_sensor_logger_payload(line):
             "light_lux": 0,
             "noise_db": 0,
             "battery_level": 100,
+            "battery_temp": 25.0, # Default
             "timestamp": data.get("server_timestamp", datetime.datetime.now().isoformat())
         }
+
         
         # Handle custom simple payload (like our test)
         if "lux" in data and "payload" not in data:
@@ -37,7 +39,10 @@ def parse_sensor_logger_payload(line):
                 elif name == "microphone":
                     max_noise = max(max_noise, values.get("dBFS", -160))
                 elif name == "battery":
-                    metrics["battery_level"] = values.get("level", 100)
+                    metrics["battery_level"] = values.get("batteryLevel", metrics["battery_level"])
+                elif name == "battery temp":
+                    metrics["battery_temp"] = values.get("temperature", metrics["battery_temp"])
+
                     
             metrics["light_lux"] = max_lux
             metrics["noise_db"] = max_noise if max_noise > -160 else 0
@@ -66,6 +71,7 @@ def map_sensors_to_energy(metrics):
     # Let's make this proportional so it reacts smoothly to your voice!
     noise = metrics["noise_db"]
     if noise > 0: # handling our earlier mock data test
+        intensity = min(noise / 100.0, 1.0)
         appliance_kw = min(noise * 0.02, 2.0)
     else: # real phone microphone data
         # Normalize the noise: Assume -80 is silence (0 kW) and 0 is max volume (2.0 kW)
@@ -74,20 +80,44 @@ def map_sensors_to_energy(metrics):
         intensity = (clamped_noise + 80) / 80.0 
         appliance_kw = intensity * 2.0
         
-    # 3. Base Load (Fridge, etc.)
-    base_kw = 0.3
+    # 3. AC Consumption Inference (Based on Thermal Gradient)
+    # Calibrate: Phones are typically ~8C warmer than ambient room temp
+    inferred_room_temp = metrics["battery_temp"] - 8.0
     
-    total_live_kw = lighting_kw + appliance_kw + base_kw
+    # Heuristic: If room > 22°C OR if it's noisy (AC fan), AC is active.
+    # We estimate 0.3kW base AC power + 0.1kW per degree above 22°C.
+    if inferred_room_temp > 22.0:
+        ac_kw = 0.3 + (inferred_room_temp - 22.0) * 0.12
+    else:
+        # If it's noisy, maybe the AC fan is on even if it's cool
+        ac_kw = 0.05 + (intensity * 0.2) 
+        
+    ac_kw = min(ac_kw, 2.5) # Cap at 2.5kW
+
+        
+    # Suggest AC Setpoint
+    recommended_setpoint = 24.0 if inferred_room_temp > 24 else inferred_room_temp
+    
+    # 4. Base Load (Fridge, etc.)
+    base_kw = 0.25
+    
+    total_live_kw = lighting_kw + appliance_kw + ac_kw + base_kw
     
     return {
         "timestamp": metrics["timestamp"],
         "raw_lux": metrics["light_lux"],
         "raw_noise": metrics["noise_db"],
+        "raw_temp": metrics["battery_temp"],
+        "inferred_room_temp": inferred_room_temp,
+        "recommended_setpoint": recommended_setpoint,
         "live_lighting_kw": lighting_kw,
         "live_appliance_kw": appliance_kw,
+        "live_ac_kw": ac_kw,
         "live_base_kw": base_kw,
         "total_live_kw": total_live_kw
     }
+
+
 
 def get_latest_metrics():
     if not os.path.exists(DATA_FILE):
