@@ -64,36 +64,24 @@ def _build_optimization_suggestions(
     lines: list[str] = []
     app_names_lower = [a.lower() for a, _ in top3]
 
-    # Temperature-driven load (realistic copy for demos)
+    # Temperature-driven load
     hot_threshold = 26.0
     cold_threshold = 12.0
     if temp_used >= hot_threshold and any("air" in n or "conditioning" in n for n in app_names_lower):
-        lines.append("High consumption due to temperature.")
-        lines.append(
-            "Cooling load is likely elevated — try a slightly higher AC setpoint and trim use during the hottest hours."
-        )
+        lines.append("🌡️ **Hot Day Alert**: High AC load. Raise your setpoint by 1-2°C to save big.")
     if temp_used <= cold_threshold and any("heater" in n for n in app_names_lower):
-        lines.append("High consumption due to temperature.")
-        lines.append(
-            "Heating load is likely elevated on colder days — check insulation and lower setpoint when comfortable."
-        )
+        lines.append("❄️ **Cold Day Alert**: High heating load. Check for drafts to keep the warmth in.")
 
     for app, _kwh in top3:
         al = app.lower()
         if "washing" in al or "dishwasher" in al or "dryer" in al:
-            lines.append(f"**{app}:** run after 8 PM to reduce cost.")
+            lines.append(f"🧺 **{app}**: Use after 10 PM for the lowest rates.")
         elif "oven" in al or "microwave" in al:
-            lines.append(
-                f"**{app}:** batch cooking or shifting use to after 8 PM can trim peak-period cost."
-            )
+            lines.append(f"🍲 **{app}**: Batch cook your meals to avoid multiple heat-ups.")
         elif "computer" in al or "tv" in al:
-            lines.append(
-                f"**{app}:** enable sleep/standby and avoid idle all-day use to cut standby draw."
-            )
+            lines.append(f"🖥️ **{app}**: Switch to standby when not in use.")
         elif "lights" in al or "light" in al:
-            lines.append(
-                f"**{app}:** switch off when rooms are empty; after 8 PM, dim or zone lighting to save cost."
-            )
+            lines.append(f"💡 **{app}**: Turn off in empty rooms to save instantly.")
 
     # De-duplicate while preserving order
     seen: set[str] = set()
@@ -103,10 +91,9 @@ def _build_optimization_suggestions(
             seen.add(line)
             out.append(line)
     if not out:
-        out.append(
-            "Shift flexible loads to off-peak hours and review always-on devices to lower daily cost."
-        )
+        out.append("✨ **Tip**: Shift heavy use to late night for better savings.")
     return out
+
 
 
 def _build_efficiency_insights(
@@ -124,21 +111,14 @@ def _build_efficiency_insights(
         if np.isfinite(g) and g > 1e-6:
             pct_vs_global = (pred_kwh - g) / g * 100.0
             if pct_vs_global >= 5:
-                insights.append(
-                    f"**{app}** is predicted to use **{pct_vs_global:.0f}% more** than the **dataset average** "
-                    f"for this appliance type (~{g:.2f} kWh/day)."
-                )
+                insights.append(f"⚠️ **{app}** is using **{pct_vs_global:.0f}% more** than typical neighbors.")
             elif pct_vs_global <= -5:
-                insights.append(
-                    f"**{app}** is predicted to use **{abs(pct_vs_global):.0f}% less** than the **dataset average** "
-                    f"for this appliance type (~{g:.2f} kWh/day)."
-                )
+                insights.append(f"🌟 **{app}** is **{abs(pct_vs_global):.0f}% more efficient** than average!")
             else:
-                insights.append(
-                    f"**{app}** is close to the **dataset average** for this type (~{g:.2f} kWh/day)."
-                )
+                insights.append(f"✅ **{app}** usage is exactly on track with typical averages.")
         else:
-            insights.append(f"**{app}:** not enough history to compare to a global average.")
+            insights.append(f"📊 **{app}**: Monitoring your new usage pattern.")
+
 
         if np.isfinite(h) and h > 1e-6:
             pct_vs_home = (pred_kwh - h) / h * 100.0
@@ -213,742 +193,606 @@ def _build_peak_hour_insights(
     return lines
 
 
-def render_dashboard():
-    col_back, _ = st.columns([1, 10])
-    with col_back:
-        if st.button("←", key="back_btn"):
-            st.session_state.page = "landing"
-            st.rerun()
-    
-    css = """
+def apply_style():
+    """Apply unified high-fidelity styling across all pages."""
+    st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
-
-    /* Global Background & Typography */
-    .stApp, .stApp > header {
-        background-color: #060e20 !important;
-        color: #a3aac4 !important;
-        font-family: 'Manrope', sans-serif !important;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap');
+    
+    /* Global Styles */
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 10rem !important; /* Extra space for sticky footer */
     }
-
+    
+    .stApp, .stApp > header {
+        background: radial-gradient(circle at center, #1e3a8a 0%, #060e20 100%) !important;
+        font-family: 'Inter', sans-serif !important;
+        color: #ffffff !important;
+    }
+    
     [data-testid="stHeader"] {
         background-color: transparent !important;
     }
-
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #060e20 !important;
-        border-right: none !important;
-    }
     
-    /* Typography Overrides */
-    h1 {
-        font-family: 'Space Grotesk', sans-serif !important;
-        color: #ffffff !important;
+    /* Typography */
+    h1, h2, h3, h4, h5, h6, .hero-title, .feat-title, .mission-title {
+        font-family: 'Outfit', sans-serif !important;
         font-weight: 700 !important;
-        font-size: 3.5rem !important; /* display-lg */
+        color: #ffffff !important;
     }
     
-    h2, h3, h4, h5, h6 {
-        font-family: 'Space Grotesk', sans-serif !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        font-size: 0.85rem !important;
+    /* Ensure Streamlit Icons remain as icons and don't turn into text */
+    [data-testid="stHeader"] *, [data-testid="stSidebarNav"] *, .st-emotion-cache-16idsys p, [data-testid="stSidebarCollapseButton"] * {
+        font-family: inherit !important;
+    }
+    
+    /* Absolute Fix for Sidebar Icon: Hide all internal text and inject a pure Material Icon */
+    [data-testid="stSidebarCollapseButton"] button {
+        font-size: 0 !important;
+        color: transparent !important;
+    }
+    [data-testid="stSidebarCollapseButton"] button * {
+        display: none !important;
+    }
+    [data-testid="stSidebarCollapseButton"] button::before {
+        content: "chevron_right" !important;
+        font-family: 'Material Icons' !important;
+        font-size: 24px !important;
+        color: #60a5fa !important;
+        display: block !important;
+        visibility: visible !important;
     }
 
-    /* Luminous Text & Secondary Elements */
-    p, span, div {
-        color: #a3aac4;
-        font-family: 'Manrope', sans-serif;
-    }
 
-    label, .st-bb, .st-af {
+
+
+    
+    h1 { font-size: 2.2rem !important; font-weight: 800 !important; line-height: 1.1 !important; margin-bottom: 0.5rem !important; }
+    h2 { font-size: 1.5rem !important; margin-bottom: 0.5rem !important; }
+    h3 { font-size: 1.25rem !important; }
+    
+    p, span, div, label, .feature-text {
         font-family: 'Inter', sans-serif !important;
-        font-size: 0.6875rem !important; /* label-sm */
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        font-weight: 400;
     }
-
-    /* Cards & Data Tiles (The "No-Line" Rule + Tonal Layering) */
+    
+    /* Gradient Text */
+    .gradient-text {
+        background: linear-gradient(to right, #60a5fa, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+        font-weight: 800;
+    }
+    
+    /* Cards (Glassmorphism) */
+    .glass-card {
+        background: rgba(30, 41, 59, 0.4);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card:hover {
+        border-color: rgba(96, 165, 250, 0.4);
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.7);
+    }
+    
+    /* Metric Styling */
     [data-testid="stMetric"] {
-        background-color: #0d1835 !important; /* surface_container_high */
-        padding: 1.5rem !important;
-        border-radius: 0.5rem !important; /* lg */
-        border: none !important;
-        margin-bottom: 1rem !important;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+        background: rgba(30, 41, 59, 0.3) !important;
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        padding: 1rem !important;
+        border-radius: 1.25rem !important;
     }
     [data-testid="stMetricValue"] {
-        font-family: 'Space Grotesk', sans-serif !important;
-        color: #ffffff !important;
-        font-size: 2.5rem !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 1.8rem !important;
+        font-weight: 700 !important;
     }
     [data-testid="stMetricLabel"] {
         font-family: 'Inter', sans-serif !important;
-        font-size: 0.85rem !important;
-        color: #a3aac4 !important;
-        margin-bottom: 0.75rem !important;
+        font-size: 0.8rem !important;
+        color: #94a3b8 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600 !important;
     }
-    [data-testid="stMetricDelta"] {
-        font-family: 'Inter', sans-serif !important;
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 0.85rem !important;
+        font-weight: 600 !important;
+        padding: 0.6rem 1.2rem !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        font-family: 'Outfit', sans-serif !important;
     }
-
-    /* Status Indicators / Buttons */
     .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #ff8f76 0%, #ff785a 100%) !important;
-        color: #600e00 !important;
+        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
         border: none !important;
-        border-radius: 0.5rem !important;
-        font-family: 'Manrope', sans-serif !important;
-        font-weight: 700 !important;
-        padding: 0.75rem 1.5rem !important;
-        box-shadow: 0 4px 12px rgba(255, 143, 118, 0.2) !important;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        color: white !important;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4) !important;
     }
     .stButton > button[kind="primary"]:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(255, 143, 118, 0.3) !important;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.5) !important;
     }
-
     .stButton > button[kind="secondary"] {
-        background-color: transparent !important;
-        color: #ff8f76 !important;
-        border: 1px solid rgba(163, 170, 196, 0.15) !important; /* Ghost Border */
-        border-radius: 0.5rem !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        color: #ffffff !important;
     }
-
-    /* Inputs & Selectors */
+    .stButton > button[kind="secondary"]:hover {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    /* Sidebar Toggle Button Styling */
+    [data-testid="stSidebarCollapseButton"] button {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-radius: 50% !important;
+        color: #60a5fa !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    [data-testid="stSidebarCollapseButton"] button:hover {
+        background: rgba(96, 165, 250, 0.2) !important;
+        border-color: #60a5fa !important;
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #060e20 0%, #0d1b3e 100%) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2 {
+        color: #60a5fa !important;
+    }
+    
+    /* Input Fields */
     .stTextInput > div > div > input, 
     .stNumberInput > div > div > input, 
     .stSelectbox > div > div > div,
     .stDateInput > div > div > input {
-        background-color: #101c3a !important; /* surface_container_highest */
+        background-color: rgba(15, 23, 42, 0.7) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 0.75rem !important;
+        color: white !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    /* Slider & Toggle Styling */
+    .stSlider [data-testid="stTickBar"] {
+        display: none;
+    }
+    .stSlider [data-baseweb="slider"] > div > div {
+        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
+    }
+    .stSlider [data-baseweb="slider"] [role="slider"] {
+        background-color: #ffffff !important;
+        border: 2px solid #3b82f6 !important;
+    }
+    
+    [data-testid="stCheckbox"] div div {
+        background-color: #3b82f6 !important;
+    }
+    
+    /* Toggle (st.toggle) */
+    .stToggle div[data-baseweb="toggle"] > div {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .stToggle div[data-baseweb="toggle"][aria-checked="true"] > div {
+        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
+    }
+
+    /* Plots */
+    .js-plotly-plot .plotly .bg, .js-plotly-plot .plotly .paper-bg {
+        fill: transparent !important;
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #060e20; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* Custom Tab Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 1.5rem;
+        background-color: rgba(30, 41, 59, 0.4) !important;
+        padding: 0.25rem 0.75rem !important;
+        border-radius: 0.75rem !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        margin-bottom: 1rem !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 40px !important;
+        background-color: transparent !important;
+        border: none !important;
+        color: #94a3b8 !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
         color: #ffffff !important;
-        border: 1px solid rgba(163, 170, 196, 0.15) !important; /* Ghost border */
-        border-radius: 0.375rem !important;
     }
-    .stTextInput > div > div > input:focus, 
-    .stNumberInput > div > div > input:focus, 
-    .stSelectbox > div > div > div:focus {
-        border-color: rgba(255, 143, 118, 0.5) !important;
-        box-shadow: 0 0 0 1px rgba(255, 143, 118, 0.5) !important;
+    .stTabs [aria-selected="true"] {
+        color: #60a5fa !important;
     }
-
-    /* Success Alert - Glassmorphism */
-    [data-testid="stAlert"] {
-        background-color: rgba(105, 246, 184, 0.1) !important; /* Secondary glass */
-        backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(105, 246, 184, 0.2) !important;
-        color: #69f6b8 !important;
-        border-radius: 0.5rem !important;
-    }
-    
-    /* Error/Warning Alert */
-    div.st-emotion-cache-1n76uvr, div.st-emotion-cache-1n76uvr * {
-        background-color: rgba(255, 177, 72, 0.1) !important;
-        color: #ffb148 !important;
-        border: 1px solid rgba(255, 177, 72, 0.2) !important;
-    }
-
-    /* Dividers */
-    hr {
-        border-color: rgba(163, 170, 196, 0.1) !important;
-        margin: 2rem 0 !important;
-    }
-    
-    /* Hide Plotly Background */
-    .js-plotly-plot .plotly .bg {
-        fill: transparent !important;
-    }
-    .js-plotly-plot .plotly .paper-bg {
-        fill: transparent !important;
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: #60a5fa !important;
     }
     </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    col_title, col_status = st.columns([3, 1])
-    with col_title:
-        st.markdown("<h1>Kinetic Observatory</h1>", unsafe_allow_html=True)
-    with col_status:
-        st.markdown("<div style='margin-top: 1rem; background: rgba(105, 246, 184, 0.1); padding: 0.5rem 1rem; border-radius: 2rem; border: 1px solid rgba(105, 246, 184, 0.2); color: #69f6b8; display: inline-block; font-family: Inter, sans-serif; font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 600;'><span style='display:inline-block; width: 6px; height: 6px; background: #69f6b8; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 8px #69f6b8;'></span>SYSTEM LIVE</div>", unsafe_allow_html=True)
 
-    # --- LIVE COMMAND CENTER ---
-    st.header("COMMAND CENTER")
+def render_nav(key_prefix: str):
+    """Render the unified navigation bar."""
+    c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 3])
+    with c1:
+        st.markdown("<h3 style='margin:0; padding-top:5px; font-family: Outfit;'>⚡ SmartVolt AI</h3>", unsafe_allow_html=True)
     
+    pages = [
+        ("Home", "landing"),
+        ("Features", "features"),
+        ("About Us", "about"),
+        ("Predictor", "dashboard")
+    ]
+    
+    cols = [c2, c3, c4, c5]
+    for col, (label, target) in zip(cols, pages):
+        with col:
+            if st.button(label, use_container_width=True, key=f"{key_prefix}_nav_{target}"):
+                st.session_state.page = target
+                st.rerun()
+    st.markdown("<br>", unsafe_allow_html=True)
+
+def render_live_updates(tariff_per_kwh):
+    # This fragment will rerun every 2 seconds automatically
     live_metrics = get_latest_metrics()
     
     if live_metrics:
-        # We parse the timestamp directly since it's an ISO string
         try:
             last_sync = datetime.fromisoformat(live_metrics['timestamp'])
             time_diff = datetime.now() - last_sync
             status_color = "🟢" if time_diff.total_seconds() < 60 else "🟠"
             sync_text = last_sync.strftime('%H:%M:%S')
-        except ValueError:
+        except (ValueError, KeyError):
             status_color = "🟢"
-            sync_text = live_metrics['timestamp']
+            sync_text = live_metrics.get('timestamp', 'N/A')
             
-        st.write(f"{status_color} **Live Sync Status**: Last received at {sync_text} (Phone streaming active)")
-        history = get_recent_history(2)
-        prev_raw = None
-        if len(history) >= 2:
-            prev_raw = history[-2]
-            
-        def get_raw_delta(live_key, prev_key):
-            if prev_raw and live_key in live_metrics and prev_key in prev_raw:
-                diff = live_metrics[live_key] - prev_raw[prev_key]
-                if abs(diff) > 0.001:
-                    return f"{diff:+.1f}"
-            return "0.0"
-
-        l1, l2, l3, l4 = st.columns(4)
-        l1.metric("Live Lighting Load", f"{live_metrics['live_lighting_kw']:.2f} kW")
-        l2.metric("Live Appliance Load", f"{live_metrics['live_appliance_kw']:.2f} kW")
-        l3.metric("Live Base Load", f"{live_metrics['live_base_kw']:.2f} kW")
-        l4.metric("Total Live Load", f"{live_metrics['total_live_kw']:.2f} kW")
+        st.write(f"{status_color} **Auto-Sync Active**: Updating every 2s (Last: {sync_text})")
         
-        # Calculate waste if live load differs significantly from expected behavior (naive approach for demo)
+        l1, l2, l3, l4, l5 = st.columns(5)
+        l1.metric("Lighting", f"{live_metrics['live_lighting_kw']:.2f} kW")
+        l2.metric("Washing Machine", f"{live_metrics['live_appliance_kw']:.2f} kW")
+        l3.metric("AC Load", f"{live_metrics.get('live_ac_kw', 0):.2f} kW")
+        l4.metric("Base Load", f"{live_metrics['live_base_kw']:.2f} kW")
+        l5.metric("Total Load", f"{live_metrics['total_live_kw']:.2f} kW")
+        
+        st.header("THERMAL INTELLIGENCE")
+        t1, t2 = st.columns(2)
+        t1.metric("Estimated Room Temp", f"{live_metrics.get('inferred_room_temp', 25):.1f} °C")
+        t2.metric("Optimal AC Setpoint", f"{live_metrics.get('recommended_setpoint', 24):.0f} °C")
+
         st.header("LIVE INSIGHTS")
-        if live_metrics['total_live_kw'] > 1.0 and live_metrics['raw_lux'] < 50:
-            st.error("⚠️ **Energy Waste Alert**: High load detected but room is dark/empty. Did you leave appliances running?")
-        elif live_metrics['raw_lux'] > 500 and live_metrics['live_lighting_kw'] > 0:
-            st.warning("⚠️ **Energy Waste Alert**: Bright natural light detected, but lights appear to be on.")
-        elif live_metrics['raw_noise'] < -50 and live_metrics['live_appliance_kw'] > 0:
-            st.info("ℹ️ **Insight**: Low ambient noise but high appliance load. Ensure no silent appliances (heaters) are forgotten.")
-        else:
-            st.success("✅ **Consumption Status: Optimal**\n\nSystem is operating at peak efficiency. Waste detection identifies 0 leakages in current grid.")
-            
-        col_btn1, col_btn2 = st.columns([2, 10])
-        with col_btn1:
-            st.button("🔄 Refresh Live Data")
-        st.divider()
+        
+        # Simple baseline for insights if forecast not run
+        hourly_baseline = 0.4 
+        actual_load = live_metrics['total_live_kw']
+        
+        wasted_kw = 0.0
+        waste_reason = ""
+        
+        if live_metrics['raw_lux'] > 400 and live_metrics['live_lighting_kw'] > 0.05:
+            wasted_kw = live_metrics['live_lighting_kw']
+            waste_reason = "Daylight Harvesting: Lights are active during peak natural light."
+        elif actual_load > (hourly_baseline * 2.5):
+            wasted_kw = actual_load - hourly_baseline
+            waste_reason = f"Consumption Anomaly: Current load is high compared to typical base load."
+        elif actual_load > 0.5 and live_metrics['raw_lux'] < 20 and live_metrics['raw_noise'] < -60:
+            wasted_kw = actual_load - 0.15 
+            waste_reason = "Idle Load: High consumption detected in an unoccupied room."
+
+        cw1, cw2 = st.columns([1, 2])
+        with cw1:
+            st.metric("Total Waste Stream", f"{wasted_kw:.3f} kW", delta=f"{wasted_kw:+.3f} kW", delta_color="inverse")
+        with cw2:
+            if wasted_kw > 0.01:
+                st.error(f"⚠️ **Waste Detected**: {waste_reason}")
+            else:
+                st.success("✅ **Status: Optimal**. Real-time efficiency targets met.")
+
+        st.markdown("### 🎯 OPTIMAL ACTION PLAN")
+        suggestions = []
+        if live_metrics.get('inferred_room_temp', 0) > 25:
+            suggestions.append(f"🌡️ **Cooling Optimization**: Room is ~{live_metrics['inferred_room_temp']:.1f}°C. Set AC to **24°C**.")
+        if live_metrics['raw_lux'] > 300:
+            suggestions.append("💡 **Turn off your lights**: Ambient light is sufficient.")
+        if live_metrics['live_appliance_kw'] > 0.5:
+            suggestions.append("⏲️ **Wait until after 10 PM**: Large appliances are cheaper to run later.")
+        
+        if not suggestions:
+            suggestions.append("🌟 **Everything looks perfect!**")
+        
+        for s in suggestions:
+            st.markdown(f"- {s}")
     else:
-        st.info("Waiting for live sensor data... Connect your Android phone to the local server.")
-        st.button("🔄 Check Again")
-        st.divider()
-    # ---------------------------
+        st.info("Waiting for live sensor data... Connect your device.")
 
-    # Model readiness check
-    needed_models = [
-        os.path.join(MODELS_DIR, "appliance_day_model.joblib"),
-        os.path.join(MODELS_DIR, "home_day_model.joblib"),
-        os.path.join(MODELS_DIR, "building_day_model.joblib"),
-    ]
-    models_ready = all(os.path.exists(p) for p in needed_models)
-    if not models_ready:
-        st.warning("Models not trained yet. Run `python src/train.py` first.")
-        return
+# Fragment decorator must be applied after function definition to use it as a fragment
+render_live_updates = st.fragment(run_every=2)(render_live_updates)
 
+
+def render_dashboard():
+    apply_style()
+    render_nav("dash")
+    
     daily_home = load_daily_home()
     home_ids = sorted(daily_home["Home ID"].astype(str).unique().tolist())
     min_dt = pd.to_datetime(daily_home["Date"].min()).date()
     max_dt = pd.to_datetime(daily_home["Date"].max()).date()
 
-    with st.sidebar:
-        st.markdown("<h2 style='color: #ff8f76 !important; font-size: 1.5rem !important; margin-bottom: 0;'>Energy AI</h2><p style='font-family: Inter, sans-serif; font-size: 0.6875rem; color: #a3aac4; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 2rem; margin-top: 0.25rem;'><span style='display:inline-block; width: 6px; height: 6px; background: #69f6b8; border-radius: 50%; margin-right: 8px;'></span>LIVE TELEMETRY</p>", unsafe_allow_html=True)
-        
-        home_id = st.selectbox("RESIDENTIAL UNIT", home_ids)
-        target_date = st.date_input("DAY TO PREDICT", value=max_dt, min_value=min_dt, max_value=max_dt)
-        month_start = st.date_input("MONTH AGGREGATE", value=max_dt.replace(day=1), min_value=min_dt)
-
-        tariff_per_kwh = st.slider(
-            "TARIFF PER KWH",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.14,
-            step=0.01,
-        )
-
-        use_expected_temp = st.toggle("Outdoor Temp", value=False)
-        expected_temp = None
-        if use_expected_temp:
-            expected_temp = st.number_input("Expected outdoor temperature (°C)", value=28.0, step=0.5, format="%.2f")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        compute_btn = st.button("⚡ Predict Results", type="primary", use_container_width=True)
-
+    # Layout: Navigation Tabs (75%) | Controls (25%)
+    # Background Defaults
+    home_id = home_ids[0]
+    target_date = max_dt
+    month_start = max_dt.replace(day=1)
+    expected_temp = None
     predictor = load_predictor()
 
-    if not compute_btn:
-        st.header("PREDICTIVE ANALYSIS")
-        st.markdown("<div style='text-align: center; padding: 4rem; background: #0d1835; border-radius: 0.5rem; margin-top: 1rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(163, 170, 196, 0.1);'><h3 style='color: #ffffff; margin-bottom: 1rem;'>No Forecast Data Generated</h3><p>Pick inputs from the control panel and click <span style='color: #ff8f76; font-weight: 600;'>Predict Results</span> to see energy forecasting results for your selected timeline.</p></div>", unsafe_allow_html=True)
-        return
+    col_nav, col_ctrl = st.columns([3, 1])
 
-    # Predict day
-    appliance_preds = predictor.predict_appliance_day(home_id=str(home_id), target_date=target_date, expected_temp=expected_temp)
-    day_info = predictor.predict_home_and_building_day(home_id=str(home_id), target_date=target_date, expected_temp=expected_temp)
+    with col_ctrl:
+        tariff_per_kwh = st.slider("TARIFF (₹/kWh)", 0.0, 50.0, 12.0, 0.5)
+        st.markdown("<div style='text-align: right; margin-top: -1.5rem;'>", unsafe_allow_html=True)
+        st.markdown("<div style='background: rgba(105, 246, 184, 0.1); padding: 0.3rem 0.6rem; border-radius: 2rem; border: 1px solid rgba(105, 246, 184, 0.2); color: #69f6b8; display: inline-block; font-family: Inter, sans-serif; font-size: 0.6rem; letter-spacing: 0.05em; font-weight: 600;'><span style='display:inline-block; width: 4px; height: 4px; background: #69f6b8; border-radius: 50%; margin-right: 5px; box-shadow: 0 0 8px #69f6b8;'></span>LIVE</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    home_kwh_day = float(day_info["home_kwh_day"])
-    building_kwh_day = float(day_info["building_kwh_day"])
-    season_used = day_info["season"]
-    temp_used = day_info["avg_temp"]
 
-    # Predict monthly totals
-    month_total_home_kwh = predictor.predict_home_month_kwh(home_id=str(home_id), month_date=month_start, expected_temp=expected_temp)
-    month_total_building_kwh = predictor.predict_building_month_kwh(month_date=month_start, expected_temp=expected_temp)
+    with col_nav:
+        tab_live, tab_today, tab_month = st.tabs(["Live Updates", "Daily Forecast", "Monthly Analytics"])
 
-    # Cost
-    home_cost_day = home_kwh_day * float(tariff_per_kwh)
-    building_cost_day = building_kwh_day * float(tariff_per_kwh)
-    home_cost_month = month_total_home_kwh * float(tariff_per_kwh)
-    building_cost_month = month_total_building_kwh * float(tariff_per_kwh)
+    with tab_live:
+        st.markdown("<h1>LIVE TELEMETRY</h1>", unsafe_allow_html=True)
+        render_live_updates(tariff_per_kwh)
 
-    # Layout: top summary
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Home predicted energy (kWh/day)", f"{home_kwh_day:.2f}")
-    c2.metric("Home predicted cost (currency/day)", f"{home_cost_day:.2f}")
-    c3.metric("Building predicted energy (kWh/day)", f"{building_kwh_day:.2f}")
+    with tab_today:
+        st.markdown("<h1>TODAY'S ENERGY FORECAST</h1>", unsafe_allow_html=True)
+        compute_btn_today = st.button("⚡ Generate Daily Analysis", type="primary", use_container_width=True, key="btn_today")
+        
+        if not compute_btn_today:
+            st.markdown("<div style='text-align: center; padding: 4rem; background: #0d1835; border-radius: 0.5rem; margin-top: 1rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(163, 170, 196, 0.1);'><h3 style='color: #ffffff; margin-bottom: 1rem;'>No Forecast Data Generated</h3><p>Click <span style='color: #ff8f76; font-weight: 600;'>Generate Daily Analysis</span> to see results.</p></div>", unsafe_allow_html=True)
+        else:
+            # Predict day
+            appliance_preds = predictor.predict_appliance_day(home_id=str(home_id), target_date=target_date, expected_temp=expected_temp)
+            day_info = predictor.predict_home_and_building_day(home_id=str(home_id), target_date=target_date, expected_temp=expected_temp)
 
-    st.write(f"Used: season = `{season_used}`, outdoor temp (avg/typical) = `{temp_used:.2f}°C`")
+            home_kwh_day = float(day_info["home_kwh_day"])
+            home_cost_day = home_kwh_day * float(tariff_per_kwh)
+            temp_used = day_info["avg_temp"]
 
-    # Appliance-wise chart
-    if appliance_preds:
-        df_app = pd.DataFrame({"Appliance Type": list(appliance_preds.keys()), "Predicted kWh": list(appliance_preds.values())})
-        df_app = df_app.sort_values("Predicted kWh", ascending=False)
-        fig_app = px.bar(df_app, x="Appliance Type", y="Predicted kWh", title="Appliance-wise predicted energy for the day")
-        fig_app.update_layout(xaxis_tickangle=-30)
-        st.plotly_chart(fig_app, use_container_width=True)
-    else:
-        st.warning("No appliances found for selected Home ID in the dataset.")
+            # Metrics
+            c1, c2 = st.columns(2)
+            c1.metric("Predicted Home Energy", f"{home_kwh_day:.2f} kWh")
+            c2.metric("Estimated Daily Cost", f"₹{home_cost_day:.2f}")
 
-    # 2 & 3 — Optimization suggestion + efficiency insight (forecast + historical averages)
-    if appliance_preds:
-        daily_appliance_df = load_daily_appliance()
-        avg_global = _avg_kwh_by_appliance_global(daily_appliance_df)
-        avg_home = _avg_kwh_by_home_appliance(daily_appliance_df, str(home_id))
-        top3 = sorted(appliance_preds.items(), key=lambda kv: kv[1], reverse=True)[:3]
+            # Filter for requested appliances
+            target_appliances = ["Air Conditioning", "Washing Machine", "Lights", "Fridge"]
+            filtered_preds = {k: v for k, v in appliance_preds.items() if k in target_appliances}
 
-        st.markdown("### 2. Optimization suggestion")
-        st.caption("Actionable tips from today’s forecast and context (temperature, shiftable loads).")
-        st.markdown("👉 **This is your real value** — use these to cut cost and peak demand.")
-        for line in _build_optimization_suggestions(top3, temp_used):
-            st.markdown(f"- {line}")
+            # Appliance-wise chart
+            if filtered_preds:
+                df_app = pd.DataFrame({"Appliance Type": list(filtered_preds.keys()), "Predicted kWh": list(filtered_preds.values())})
+                df_app = df_app.sort_values("Predicted kWh", ascending=False)
+                fig_app = px.bar(df_app, x="Appliance Type", y="Predicted kWh", title="Core Appliance Forecast (Focused View)")
+                fig_app.update_layout(xaxis_tickangle=-30)
+                st.plotly_chart(fig_app, use_container_width=True)
 
-        st.markdown("### 3. Efficiency insight")
-        st.caption(
-            "How today’s predicted use compares to averages, plus **peak-hour concentration** inferred from **row-level `Time`** in the raw data (6–10 PM vs after 8 PM)."
-        )
-        for line in _build_efficiency_insights(appliance_preds, top3, avg_global, avg_home):
-            st.markdown(f"- {line}")
-        peak_payload = load_peak_hour_usage()
-        for line in _build_peak_hour_insights(str(home_id), top3, peak_payload):
-            st.markdown(f"- {line}")
+                # Insights using filtered data
+                daily_appliance_df = load_daily_appliance()
+                avg_global = _avg_kwh_by_appliance_global(daily_appliance_df)
+                avg_home = _avg_kwh_by_home_appliance(daily_appliance_df, str(home_id))
+                top3 = sorted(filtered_preds.items(), key=lambda kv: kv[1], reverse=True)[:3]
 
-    # Home vs building summary
-    st.subheader("Daily totals")
-    c4, c5, c6 = st.columns(3)
-    c4.metric("Home total (kWh/day)", f"{home_kwh_day:.2f}")
-    c5.metric("Home total cost/day", f"{home_cost_day:.2f}")
-    c6.metric("Building cost/day", f"{building_cost_day:.2f}")
+                st.markdown("### 1. Optimization suggestions")
+                for line in _build_optimization_suggestions(top3, temp_used):
+                    st.markdown(f"- {line}")
 
-    # Monthly totals
-    st.subheader("Monthly totals")
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.metric("Home total (kWh/month)", f"{month_total_home_kwh:.2f}")
-    mc2.metric("Home total cost/month", f"{home_cost_month:.2f}")
-    mc3.metric("Building total cost/month", f"{building_cost_month:.2f}")
+                st.markdown("### 2. Efficiency insights")
+                for line in _build_efficiency_insights(appliance_preds, top3, avg_global, avg_home):
+                    st.markdown(f"- {line}")
+            
+    with tab_month:
+        st.markdown("<h1>MONTHLY CONSUMPTION ANALYTICS</h1>", unsafe_allow_html=True)
+        compute_btn_month = st.button("⚡ Generate Monthly Analysis", type="primary", use_container_width=True, key="btn_month")
 
-    # Optional: show actual vs predicted last 14 days for home (if within dataset)
-    st.subheader("Home: last 14 days (actual vs predicted)")
-    days = [pd.to_datetime(target_date) - pd.Timedelta(days=i) for i in range(13, -1, -1)]
-    actual = (
-        daily_home[(daily_home["Home ID"].astype(str) == str(home_id)) & (daily_home["Date"].isin(days))]
-        .copy()
-    )
-    actual = actual.sort_values("Date")
-    # Predict using typical weather (no expected_temp) to look like a forecast
-    preds = []
-    for d in days:
-        info = predictor.predict_home_and_building_day(
-            home_id=str(home_id),
-            target_date=d.date(),
-            expected_temp=expected_temp if use_expected_temp else None,
-        )
-        preds.append({"Date": d.date(), "Predicted kWh": float(info["home_kwh_day"])})
-    pred_df = pd.DataFrame(preds)
+        if not compute_btn_month:
+             st.markdown("<div style='text-align: center; padding: 4rem; background: #0d1835; border-radius: 0.5rem; margin-top: 1rem; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); border: 1px solid rgba(163, 170, 196, 0.1);'><h3 style='color: #ffffff; margin-bottom: 1rem;'>No Forecast Data Generated</h3><p>Click <span style='color: #ff8f76; font-weight: 600;'>Generate Monthly Analysis</span> to see results.</p></div>", unsafe_allow_html=True)
+        else:
+            # Predict monthly totals
+            month_total_home_kwh = predictor.predict_home_month_kwh(home_id=str(home_id), month_date=month_start, expected_temp=expected_temp)
+            home_cost_month = month_total_home_kwh * float(tariff_per_kwh)
 
-    actual_df = actual[["Date", "kwh_day"]].copy()
-    actual_df["Date"] = pd.to_datetime(actual_df["Date"]).dt.date
-    actual_df = actual_df.rename(columns={"kwh_day": "Actual kWh"})
+            # Monthly totals
+            mc1, mc2 = st.columns(2)
+            mc1.metric("Home total (kWh/month)", f"{month_total_home_kwh:.2f}")
+            mc2.metric("Home total cost/month", f"₹{home_cost_month:.2f}")
 
-    plot_df = actual_df.merge(pred_df, on="Date", how="left")
-    plot_df["Date"] = plot_df["Date"].astype(str)
-    fig_line = px.line(plot_df, x="Date", y=["Actual kWh", "Predicted kWh"], markers=True)
-    st.plotly_chart(fig_line, use_container_width=True)
+
+
+        # End of Monthly Predicted Energy
+
+
+
 
 
 def render_features_page():
-    css = """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+    apply_style()
+    render_nav("feat")
     
-    .block-container {
-        padding-top: 2rem !important;
-    }
-    
-    .stApp, .stApp > header {
-        background: radial-gradient(circle at center, #1e3a8a 0%, #0f172a 100%) !important;
-        font-family: 'Inter', sans-serif !important;
-        color: #ffffff !important;
-    }
-    
-    [data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-    
-    .feat-title {
-        font-size: 3rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
-        text-align: center;
-        color: #ffffff;
-    }
-    .feat-title span {
-        background: linear-gradient(to right, #3b82f6, #8b5cf6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .feat-sub {
-        color: #94a3b8;
-        font-size: 1.1rem;
-        max-width: 600px;
-        margin: 0 auto 3rem auto;
-        line-height: 1.5;
-        text-align: center;
-    }
-    .feature-card {
-        background: rgba(30, 41, 59, 0.5);
-        border: 1px solid rgba(255,255,255,0.05);
-        border-radius: 1rem;
-        padding: 2rem;
-        height: 100%;
-    }
-    .feature-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-        color: #ffffff;
-    }
-    .feature-text {
-        color: #94a3b8;
-        line-height: 1.5;
-        font-size: 0.95rem;
-    }
-    
-    /* Buttons */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 0.5rem !important;
-        font-weight: 600 !important;
-        padding: 0.75rem 1.5rem !important;
-    }
-    .stButton > button[kind="secondary"] {
-        background-color: transparent !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
-        border-radius: 0.5rem !important;
-    }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-    
-    # Navbar
-    c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 3])
-    with c1:
-        st.markdown("<h3 style='margin:0; padding-top:5px;'>⚡ SmartVolt AI</h3>", unsafe_allow_html=True)
-    with c2:
-        if st.button("Home", use_container_width=True, key="feat_nav_home"):
-            st.session_state.page = "landing"
-            st.rerun()
-    with c3:
-        if st.button("Features", use_container_width=True, key="feat_nav_feat"):
-            st.session_state.page = "features"
-            st.rerun()
-    with c4:
-        if st.button("About Us", use_container_width=True, key="feat_nav_about"):
-            st.session_state.page = "about"
-            st.rerun()
-    with c5:
-        if st.button("Predictor", use_container_width=True, key="feat_nav_pred"):
-            st.session_state.page = "dashboard"
-            st.rerun()
-            
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    
-    st.markdown("<div class='feat-title'>System <span>Capabilities</span></div>", unsafe_allow_html=True)
-    st.markdown("<div class='feat-sub'>Our end-to-end pipeline leverages AI and IoT to revolutionize building management.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='feat-title' style='text-align:center;'>System <span class='gradient-text'>Capabilities</span></div>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #94a3b8; font-size: 1.1rem; max-width: 600px; margin: 0 auto 3rem auto; text-align: center;'>Our end-to-end pipeline leverages AI and IoT to revolutionize building management.</p>", unsafe_allow_html=True)
     
     _, center_col, _ = st.columns([1, 4, 1])
     with center_col:
         f1, f2 = st.columns(2)
         with f1:
             st.markdown('''
-            <div class="feature-card">
-                <div style="font-size: 2rem; margin-bottom: 1rem; color: #3b82f6;">📱</div>
-                <div class="feature-title">Live Sensor Telemetry</div>
-                <div class="feature-text">Connect the Sensor Logger app to stream real-time environmental data (lux, noise) to dynamically calculate live infrastructure power draw.</div>
+            <div class="glass-card">
+                <div style="font-size: 2.5rem; margin-bottom: 1.5rem; color: #3b82f6;">📱</div>
+                <h3 style="margin-bottom: 0.75rem;">Live Sensor Telemetry</h3>
+                <div class="feature-text" style="color: #94a3b8; line-height: 1.6;">Connect the Sensor Logger app to stream real-time environmental data (lux, noise) to dynamically calculate live infrastructure power draw.</div>
             </div>
             ''', unsafe_allow_html=True)
         with f2:
             st.markdown('''
-            <div class="feature-card">
-                <div style="font-size: 2rem; margin-bottom: 1rem; color: #8b5cf6;">🤖</div>
-                <div class="feature-title">Predictive Load Modeling</div>
-                <div class="feature-text">Leverage historical datasets and advanced machine learning models to forecast daily and monthly energy consumption with pinpoint accuracy.</div>
+            <div class="glass-card">
+                <div style="font-size: 2.5rem; margin-bottom: 1.5rem; color: #8b5cf6;">🤖</div>
+                <h3 style="margin-bottom: 0.75rem;">Predictive Load Modeling</h3>
+                <div class="feature-text" style="color: #94a3b8; line-height: 1.6;">Leverage historical datasets and advanced machine learning models to forecast daily and monthly energy consumption with pinpoint accuracy.</div>
             </div>
             ''', unsafe_allow_html=True)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
             
         f3, f4 = st.columns(2)
         with f3:
             st.markdown('''
-            <div class="feature-card">
-                <div style="font-size: 2rem; margin-bottom: 1rem; color: #10b981;">☀️</div>
-                <div class="feature-title">Daylight Harvesting</div>
-                <div class="feature-text">Automatically adjust your lighting loads in real-time based on ambient sunlight availability to maximize efficiency without sacrificing comfort.</div>
+            <div class="glass-card">
+                <div style="font-size: 2.5rem; margin-bottom: 1.5rem; color: #10b981;">☀️</div>
+                <h3 style="margin-bottom: 0.75rem;">Daylight Harvesting</h3>
+                <div class="feature-text" style="color: #94a3b8; line-height: 1.6;">Automatically adjust your lighting loads in real-time based on ambient sunlight availability to maximize efficiency without sacrificing comfort.</div>
             </div>
             ''', unsafe_allow_html=True)
         with f4:
             st.markdown('''
-            <div class="feature-card">
-                <div style="font-size: 2rem; margin-bottom: 1rem; color: #f97316;">📊</div>
-                <div class="feature-title">Peak-Hour Analytics</div>
-                <div class="feature-text">Gain actionable insights into appliance-level consumption patterns and identify high-cost demand spikes during the critical 6 PM - 10 PM peak window.</div>
+            <div class="glass-card">
+                <div style="font-size: 2.5rem; margin-bottom: 1.5rem; color: #f97316;">📊</div>
+                <h3 style="margin-bottom: 0.75rem;">Peak-Hour Analytics</h3>
+                <div class="feature-text" style="color: #94a3b8; line-height: 1.6;">Gain actionable insights into appliance-level consumption patterns and identify high-cost demand spikes during the critical 6 PM - 10 PM peak window.</div>
             </div>
             ''', unsafe_allow_html=True)
 
+
 def render_about_page():
-    css = """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+    apply_style()
+    render_nav("abt")
     
-    .block-container {
-        padding-top: 2rem !important;
-    }
-    
-    .stApp, .stApp > header {
-        background: radial-gradient(circle at center, #1e3a8a 0%, #0f172a 100%) !important;
-        font-family: 'Inter', sans-serif !important;
-        color: #ffffff !important;
-    }
-    
-    [data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-    
-    /* Buttons */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 0.5rem !important;
-        font-weight: 600 !important;
-        padding: 0.75rem 1.5rem !important;
-    }
-    .stButton > button[kind="secondary"] {
-        background-color: transparent !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
-        border-radius: 0.5rem !important;
-    }
-    
-    /* About Us Specifics */
-    .mission-container {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 1rem;
-        padding: 4rem 3rem;
-        max-width: 800px;
-        margin: 2rem auto;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-    .mission-title {
-        font-size: 3.5rem;
-        font-weight: 800;
-        margin-bottom: 2rem;
-        color: #ffffff;
-    }
-    .mission-title span {
-        background: linear-gradient(to right, #3b82f6, #8b5cf6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .mission-text {
-        color: #e2e8f0;
-        font-size: 1.15rem;
-        line-height: 1.8;
-        margin-bottom: 1.5rem;
-    }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-    
-    # Navbar
-    c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 3])
-    with c1:
-        st.markdown("<h3 style='margin:0; padding-top:5px;'>⚡ SmartVolt AI</h3>", unsafe_allow_html=True)
-    with c2:
-        if st.button("Home", use_container_width=True, key="abt_nav_home"):
-            st.session_state.page = "landing"
-            st.rerun()
-    with c3:
-        if st.button("Features", use_container_width=True, key="abt_nav_feat"):
-            st.session_state.page = "features"
-            st.rerun()
-    with c4:
-        if st.button("About Us", use_container_width=True, key="abt_nav_about"):
-            st.session_state.page = "about"
-            st.rerun()
-    with c5:
-        if st.button("Predictor", use_container_width=True, key="abt_nav_pred"):
-            st.session_state.page = "dashboard"
-            st.rerun()
-            
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    
+    # Statistical Impact Row
     st.markdown("""
-    <div class="mission-container">
-        <div class="mission-title">Mission <span>Statement</span></div>
-        <div class="mission-text">
-            At SmartVolt AI, we believe that the intersection of advanced artificial intelligence and real-time IoT telemetry holds the key to a sustainable future. Our objective is to seamlessly integrate intelligent predictive models with physical infrastructure, empowering buildings to dynamically optimize their own energy consumption without sacrificing human comfort.
+    <div style='display: flex; justify-content: space-around; gap: 2rem; margin-bottom: 3.5rem; text-align: center;'>
+        <div style='flex: 1; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.05);'>
+            <div style='font-size: 2.5rem; font-weight: 800; color: #ff8f76;'>40%</div>
+            <div style='font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.5rem;'>Global CO2 Emissions from Buildings</div>
         </div>
-        <div class="mission-text">
-            By shifting from reactive management to proactive forecasting, we are redefining what it means to be energy-efficient. Our end-to-end platform not only slashes operational costs but fundamentally reduces global carbon footprints, proving that cutting-edge technology and environmental responsibility can—and must—go hand in hand.
+        <div style='flex: 1; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.05);'>
+            <div style='font-size: 2.5rem; font-weight: 800; color: #60a5fa;'>30%</div>
+            <div style='font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.5rem;'>Avg. Energy Wasted in Infrastructure</div>
+        </div>
+        <div style='flex: 1; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.05);'>
+            <div style='font-size: 2.5rem; font-weight: 800; color: #10b981;'>$20B+</div>
+            <div style='font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.5rem;'>Annual Loss due to Inefficient Cooling</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    col_miss, col_biz = st.columns(2)
+
+
+    
+    with col_miss:
+        st.markdown("""
+        <div class="glass-card" style="height: 100%; text-align: left; padding: 2.5rem;">
+            <div style="font-size: 2.5rem; margin-bottom: 1.5rem;">🎯</div>
+            <h1 style="font-size: 2.5rem; margin-bottom: 1.5rem;">Mission <span class="gradient-text">Statement</span></h1>
+            <p style="color: #e2e8f0; font-size: 1.05rem; line-height: 1.8; margin-bottom: 1.5rem;">
+                At SmartVolt AI, we believe that the intersection of AI and real-time IoT telemetry holds the key to a sustainable future. We integrate intelligent models with physical infrastructure to optimize energy consumption.
+            </p>
+            <p style="color: #e2e8f0; font-size: 1.05rem; line-height: 1.8;">
+                By shifting to proactive forecasting, we slash operational costs and reduce global carbon footprints, proving that technology and responsibility must go hand in hand.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_biz:
+        st.markdown("""
+        <div class="glass-card" style="height: 100%; text-align: left; padding: 2.5rem;">
+            <div style="font-size: 2.5rem; margin-bottom: 1.5rem;">📈</div>
+            <h1 style="font-size: 2.5rem; margin-bottom: 1.5rem;">Business <span class="gradient-text">Aspect</span></h1>
+            <p style="color: #e2e8f0; font-size: 1.05rem; line-height: 1.8; margin-bottom: 1.5rem;">
+                SmartVolt AI drives economic value by identifying hidden inefficiencies. Our platform enables facility managers to reduce energy overhead by up to 30% through predictive peak-load management and automated waste detection.
+            </p>
+            <p style="color: #e2e8f0; font-size: 1.05rem; line-height: 1.8;">
+                We transform environmental sustainability into a competitive financial advantage, providing a clear ROI through reduced utility bills and optimized resource allocation across entire building portfolios.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+
+    # The SmartVolt Resolution
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); padding: 3rem; border-radius: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.05); text-align: center;'>
+        <h2 style='margin-bottom: 1.5rem;'>The SmartVolt <span class='gradient-text'>Resolution</span></h2>
+        <p style='color: #94a3b8; max-width: 800px; margin: 0 auto 2rem auto; font-size: 1.1rem;'>
+            We resolve these global inefficiencies through a three-pillar technological framework:
+        </p>
+        <div style='display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem;'>
+            <div>
+                <h4 style='color: #60a5fa;'>1. Predictive Forecasting</h4>
+                <p style='font-size: 0.9rem; color: #a3aac4;'>ML models anticipate load spikes 24 hours in advance, allowing for proactive shifting.</p>
+            </div>
+            <div>
+                <h4 style='color: #c084fc;'>2. IoT Sensor Fusion</h4>
+                <p style='font-size: 0.9rem; color: #a3aac4;'>Real-time lux and noise data detect occupancy and natural light availability instantly.</p>
+            </div>
+            <div>
+                <h4 style='color: #10b981;'>3. Autonomous Optimization</h4>
+                <p style='font-size: 0.9rem; color: #a3aac4;'>Dynamic feedback loops suggest or automate adjustments to lighting and thermal loads.</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def render_landing_page():
-    css = """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+
+    apply_style()
+    render_nav("land")
     
-    .block-container {
-        padding-top: 2rem !important;
-    }
-    
-    .stApp, .stApp > header {
-        background: radial-gradient(circle at center, #1e3a8a 0%, #0f172a 100%) !important;
-        font-family: 'Inter', sans-serif !important;
-        color: #ffffff !important;
-    }
-    
-    [data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-    
-    .hero-title {
-        font-size: 4rem;
-        font-weight: 800;
-        margin-bottom: 1.5rem;
-        text-align: center;
-        color: #ffffff;
-    }
-    .hero-title span {
-        background: linear-gradient(to right, #3b82f6, #8b5cf6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    .hero-sub {
-        color: #94a3b8;
-        font-size: 1.25rem;
-        max-width: 800px;
-        margin: 0 auto 3rem auto;
-        line-height: 1.6;
-        text-align: center;
-    }
-    .feature-card {
-        background: rgba(30, 41, 59, 0.5);
-        border: 1px solid rgba(255,255,255,0.05);
-        border-radius: 1rem;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        height: 100%;
-    }
-    .feature-title {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-        color: #ffffff;
-    }
-    .feature-text {
-        color: #94a3b8;
-        line-height: 1.5;
-    }
-    
-    /* Buttons */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 0.5rem !important;
-        font-weight: 600 !important;
-        padding: 0.75rem 1.5rem !important;
-    }
-    .stButton > button[kind="secondary"] {
-        background-color: transparent !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
-        border-radius: 0.5rem !important;
-    }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-    
-    # Navbar
-    c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 3])
-    with c1:
-        st.markdown("<h3 style='margin:0; padding-top:5px;'>⚡ SmartVolt AI</h3>", unsafe_allow_html=True)
-    with c2:
-        if st.button("Home", use_container_width=True, key="nav_home"):
-            st.session_state.page = "landing"
-            st.rerun()
-    with c3:
-        if st.button("Features", use_container_width=True, key="nav_feat"):
-            st.session_state.page = "features"
-            st.rerun()
-    with c4:
-        if st.button("About Us", use_container_width=True, key="nav_about"):
-            st.session_state.page = "about"
-            st.rerun()
-    with c5:
-        if st.button("Predictor", use_container_width=True, key="nav_pred"):
-            st.session_state.page = "dashboard"
-            st.rerun()
-            
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
     # Hero
-    st.markdown("<div class='hero-title'>AI-Driven Energy <span>Forecasting</span></div>", unsafe_allow_html=True)
-    st.markdown("<div class='hero-sub'>Connect live IoT telemetry with predictive machine learning models to monitor real-time power draw, analyze appliance-level efficiency, and cut energy costs during peak hours.</div>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; font-size: 4.5rem; line-height: 1.1; margin-bottom: 1.5rem;'>AI-Driven Energy <br><span class='gradient-text'>Forecasting</span></h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 1.25rem; max-width: 800px; margin: 0 auto 3rem auto; line-height: 1.6;'>Connect live IoT telemetry with predictive machine learning models to monitor real-time power draw, analyze appliance-level efficiency, and cut energy costs during peak hours.</p>", unsafe_allow_html=True)
     
     col_b1, col_b2, col_b3 = st.columns([4, 2, 4])
     with col_b2:
         if st.button("Enter Live Dashboard ➡️", type="primary", use_container_width=True, key="enter_dash"):
             st.session_state.page = "dashboard"
             st.rerun()
-            
-    st.markdown("<br>", unsafe_allow_html=True)
+
     
 
 
 def render_footer():
     st.markdown("""
-    <div style="position: fixed; bottom: 0; left: 0; width: 100%; background-color: rgba(15, 23, 42, 0.95); border-top: 1px solid rgba(255,255,255,0.05); padding: 1rem 0; z-index: 999; text-align: center; color: #64748b; font-size: 0.95rem; font-family: 'Inter', sans-serif;">
-        © 2026 SmartVolt AI. Built for the AntiGravity Project. All rights reserved.<br>
-        <span style="font-size: 0.85rem; opacity: 0.7;">Powered by IoT Telemetry & Predictive Analytics</span>
+    <div style="position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(6, 14, 32, 0.9); backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.1); padding: 1.25rem 0; z-index: 999; text-align: center; color: #94a3b8; font-family: 'Outfit', sans-serif;">
+        <p style="margin: 0; font-size: 0.9rem; font-weight: 500; letter-spacing: 0.02em;">© 2026 SmartVolt AI. Built for the AntiGravity Project. All rights reserved.</p>
+        <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; opacity: 0.6; font-family: 'Inter', sans-serif;">Powered by IoT Telemetry & Predictive Machine Learning</p>
     </div>
     """, unsafe_allow_html=True)
 
+
 def main():
-    st.set_page_config(page_title="Antigravity Platform", layout="wide")
+    st.set_page_config(page_title="Antigravity Platform", layout="wide", initial_sidebar_state="expanded")
     
     if "page" not in st.session_state:
         st.session_state.page = "landing"
@@ -962,6 +806,7 @@ def main():
     else:
         render_dashboard()
         
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     render_footer()
 
 if __name__ == "__main__":
